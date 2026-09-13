@@ -6,10 +6,13 @@ import android.os.Bundle
 import android.view.*
 import android.widget.*
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.appcompat.app.AlertDialog
 import androidx.fragment.app.Fragment
 import androidx.health.connect.client.PermissionController
 import androidx.lifecycle.lifecycleScope
+import com.devtool.gpsmocker.R
 import com.devtool.gpsmocker.databinding.FragmentSettingsBinding
+import com.devtool.gpsmocker.ui.LandmarkListActivity
 import com.devtool.gpsmocker.ui.SharedViewModel
 import android.Manifest
 import android.content.pm.PackageManager
@@ -58,6 +61,12 @@ class SettingsFragment : Fragment() {
         super.onViewCreated(v, s)
         loadSettings()
         setupListeners()
+        refreshDbStats()
+    }
+
+    override fun onResume() {
+        super.onResume()
+        // 從地標管理畫面或地圖頁刪除地標後返回時，重新讀取統計數字
         refreshDbStats()
     }
 
@@ -144,6 +153,30 @@ class SettingsFragment : Fragment() {
         binding.btnStopFetch.setOnClickListener     { stopFetch() }
         binding.btnExportCsv.setOnClickListener     { exportCsv() }
         binding.btnImportCsv.setOnClickListener     { openCsvPicker() }
+
+        // 地標管理 / 清空全部
+        binding.btnManageLandmarks.setOnClickListener {
+            startActivity(Intent(requireContext(), LandmarkListActivity::class.java))
+        }
+        binding.btnDeleteAllLandmarks.setOnClickListener { confirmDeleteAllLandmarks() }
+    }
+
+    // ── 地標刪除 ─────────────────────────────────────────────────────────────
+
+    private fun confirmDeleteAllLandmarks() {
+        val ctx = context ?: return
+        AlertDialog.Builder(ctx, R.style.AlertDialogDark)
+            .setTitle("清空地標資料庫")
+            .setMessage("確定要刪除全部地標嗎？此動作無法復原，需重新從 Wikipedia 抓取。")
+            .setPositiveButton("全部刪除") { _, _ ->
+                lifecycleScope.launch {
+                    WikiLandmarkHelper.deleteAll(ctx)
+                    toast("已清空地標資料庫")
+                    refreshDbStats()
+                }
+            }
+            .setNegativeButton("取消", null)
+            .show()
     }
 
     // ── Fetch ─────────────────────────────────────────────────────────────────

@@ -52,6 +52,12 @@
             </intent-filter>
         </activity>
 
+        <!-- 地標管理畫面（瀏覽 / 刪除已下載的地標） -->
+        <activity
+            android:name=".ui.LandmarkListActivity"
+            android:exported="false"
+            android:theme="@style/Theme.GpsMocker"/>
+
         <service
             android:name=".service.MockLocationService"
             android:foregroundServiceType="location"

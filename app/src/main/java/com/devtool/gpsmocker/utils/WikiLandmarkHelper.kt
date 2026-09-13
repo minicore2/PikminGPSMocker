@@ -9,6 +9,7 @@ import kotlinx.coroutines.withContext
 import org.osmdroid.util.GeoPoint
 
 data class LandmarkResult(
+    val id:      Int = 0,   // 0 = 來自種子清單（不在資料庫中，不可刪除）
     val name:    String,
     val summary: String,
     val point:   GeoPoint
@@ -42,12 +43,33 @@ object WikiLandmarkHelper {
             LandmarkDatabase.get(context).landmarkDao().statsByContinent()
         }
 
+    // ── 清單瀏覽 / 刪除 ──────────────────────────
+
+    /** 取得全部地標，或依關鍵字搜尋（空字串＝全部）— 供地標管理畫面使用 */
+    suspend fun search(context: Context, query: String): List<LandmarkEntity> =
+        withContext(Dispatchers.IO) {
+            val dao = LandmarkDatabase.get(context).landmarkDao()
+            if (query.isBlank()) dao.getAll() else dao.search(query.trim())
+        }
+
+    /** 刪除單筆地標 */
+    suspend fun deleteById(context: Context, id: Int) =
+        withContext(Dispatchers.IO) {
+            LandmarkDatabase.get(context).landmarkDao().deleteById(id)
+        }
+
+    /** 清空整個地標資料庫 */
+    suspend fun deleteAll(context: Context) =
+        withContext(Dispatchers.IO) {
+            LandmarkDatabase.get(context).landmarkDao().deleteAll()
+        }
+
     private fun LandmarkEntity.toLandmarkResult() =
-        LandmarkResult(name = name, summary = summary, point = GeoPoint(lat, lon))
+        LandmarkResult(id = id, name = name, summary = summary, point = GeoPoint(lat, lon))
 
     private data class Seed(val name: String, val lat: Double, val lon: Double)
     private fun Seed.toLandmarkResult() =
-        LandmarkResult(name = name, summary = "", point = GeoPoint(lat, lon))
+        LandmarkResult(id = 0, name = name, summary = "", point = GeoPoint(lat, lon))
 
     // ~100 seed landmarks across all continents — used before first DB fetch
     private val SEEDS = listOf(

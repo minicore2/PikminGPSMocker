@@ -12,6 +12,7 @@ import android.view.*
 import android.view.inputmethod.EditorInfo
 import android.view.inputmethod.InputMethodManager
 import android.widget.Toast
+import androidx.appcompat.app.AlertDialog
 import androidx.core.content.ContextCompat
 import androidx.fragment.app.Fragment
 import androidx.lifecycle.lifecycleScope
@@ -69,9 +70,15 @@ class MapFragment : Fragment() {
     private val waypoints       = mutableListOf<GeoPoint>()
     private val waypointMarkers = mutableListOf<Marker>()
     private val routeLines      = mutableListOf<Polyline>()
+    // 「沿道路走」模式查到實際路徑後，用來畫出真實道路路線的疊加線
+    // （跟 routeLines 分開存放，因為它不是使用者點的航點連線，是查詢結果）
+    private val roadPreviewLines = mutableListOf<Polyline>()
     private var movingMarker:   Marker? = null
 
     private var searchJob: Job? = null
+
+    // 目前地圖上顯示的地標資料庫 id（來自隨機地標功能）；null = 不可刪除（種子清單或無地標）
+    private var currentLandmarkId: Int? = null
 
     // Handler for posting UI updates from Service callbacks (which run on Dispatchers.Default)
     private val mainHandler = Handler(Looper.getMainLooper())
@@ -227,6 +234,7 @@ class MapFragment : Fragment() {
     }
 
     private fun handleMapTap(point: GeoPoint) {
+        hideLandmarkDeleteButton()
         when (mode) {
             Mode.FIXED -> {
                 placeFixedMarker(point)
@@ -241,6 +249,7 @@ class MapFragment : Fragment() {
     private fun setupSearch() {
         val binding = b ?: return
         val adapter = SearchResultAdapter { result ->
+            hideLandmarkDeleteButton()
             b?.cardSearchResults?.visibility = View.GONE
             b?.etSearch?.clearFocus()
             hideSoftKeyboard()
@@ -263,6 +272,9 @@ class MapFragment : Fragment() {
         binding.btnRandomLandmark.setOnClickListener {
             teleportToRandomLandmark()
         }
+        binding.btnDeleteLandmark.setOnClickListener {
+            confirmDeleteCurrentLandmark()
+        }
         binding.etSearch.setOnEditorActionListener { _, actionId, _ ->
             if (actionId == EditorInfo.IME_ACTION_SEARCH) {
                 triggerSearch(b?.etSearch?.text?.toString() ?: ""); true
@@ -279,6 +291,7 @@ class MapFragment : Fragment() {
 
     private fun triggerSearch(query: String) {
         if (query.isBlank()) return
+        hideLandmarkDeleteButton()
         searchJob?.cancel()
         b?.cardSearchResults?.visibility = View.VISIBLE
         searchJob = lifecycleScope.launch {
@@ -353,6 +366,10 @@ class MapFragment : Fragment() {
         binding.cbLoop.setOnCheckedChangeListener { _, c ->
             context?.let { AppPrefs.saveLoop(it, c) }
         }
+        binding.cbFollowRoad.isChecked = AppPrefs.loadFollowRoad(context ?: return)
+        binding.cbFollowRoad.setOnCheckedChangeListener { _, c ->
+            context?.let { AppPrefs.saveFollowRoad(it, c) }
+        }
     }
 
     // ── Start / Stop ──────────────────────────────
@@ -379,7 +396,15 @@ class MapFragment : Fragment() {
                 val overrideStart: GeoPoint? = resolveStartPoint()
 
                 val looping = b?.cbLoop?.isChecked ?: AppPrefs.loadLoop(ctx)
-                val startPt = overrideStart ?: waypoints.first()
+                val followRoad = b?.cbFollowRoad?.isChecked ?: AppPrefs.loadFollowRoad(ctx)
+
+                // 把 overrideStart 套用進航點清單，兩種子模式共用同一份基礎點位。
+                // (原本這個套用動作是丟給 MockLocationService.startRoute() 內部做，
+                //  這裡先在 Fragment 端做好，讓「沿道路走」模式能查詢到正確的起點。)
+                val basePts: List<GeoPoint> =
+                    if (overrideStart != null) listOf(overrideStart) + waypoints.drop(1)
+                    else waypoints.toList()
+                val startPt = basePts.first()
 
                 // Jump map to the actual start point immediately so user sees where
                 // the simulation begins — especially important when using
@@ -391,9 +416,38 @@ class MapFragment : Fragment() {
                 }
 
                 placeMovingMarker(startPt)
-                wireCallbacks(s)
-                s.startRoute(waypoints.toList(), looping, overrideStart)
-                setRunning(true)
+
+                if (followRoad) {
+                    // 模式二：沿道路走。先向 OSRM 查詢貼著道路的路徑，
+                    // 查詢期間先鎖住開始鍵避免重複觸發；查詢失敗則自動退回直線模式。
+                    b?.tvCoords?.text = "🛣️ 正在規劃道路路線…"
+                    b?.btnStartStop?.isEnabled = false
+                    lifecycleScope.launch {
+                        val roadPts = RoutingHelper.fetchRoadRoute(basePts)
+                        if (!isAdded) return@launch
+                        b?.btnStartStop?.isEnabled = true
+
+                        val finalPts: List<GeoPoint>
+                        if (roadPts != null) {
+                            finalPts = roadPts
+                            drawRoadPreview(finalPts)
+                        } else {
+                            toast("⚠️ 道路路線查詢失敗，已改用直線模式")
+                            finalPts = basePts
+                        }
+
+                        wireCallbacks(s)
+                        // overrideStart 已經套用進 basePts/finalPts，這裡固定傳 null
+                        // 避免 MockLocationService 內部重複套用一次。
+                        s.startRoute(finalPts, looping, null)
+                        setRunning(true)
+                    }
+                } else {
+                    // 模式一：直線模式（原本行為，完全不變）
+                    wireCallbacks(s)
+                    s.startRoute(basePts, looping, null)
+                    setRunning(true)
+                }
             }
         }
     }
@@ -476,6 +530,7 @@ class MapFragment : Fragment() {
             b?.btnRandomLandmark?.isEnabled = true
 
             if (result == null) {
+                hideLandmarkDeleteButton()
                 toast("🌐 無法取得地標，請檢查網路連線")
                 b?.tvCoords?.text = if (mode == Mode.FIXED)
                     "點選地圖設定固定位置" else "點選地圖新增航點"
@@ -483,6 +538,11 @@ class MapFragment : Fragment() {
             }
 
             val point = result.point
+
+            // 記錄目前地標的資料庫 id（種子清單 id=0 代表不可刪除），並更新刪除鍵顯示
+            currentLandmarkId = result.id.takeIf { it > 0 }
+            b?.btnDeleteLandmark?.visibility =
+                if (currentLandmarkId != null) View.VISIBLE else View.GONE
 
             // Animate map to the landmark immediately (before placing marker)
             b?.mapView?.controller?.animateTo(point)
@@ -500,6 +560,30 @@ class MapFragment : Fragment() {
             }
             toast("🎲 ${result.name}")
         }
+    }
+
+    /** 隱藏刪除地標鍵並清除目前記錄的地標 id（換了目標、清除地圖時呼叫） */
+    private fun hideLandmarkDeleteButton() {
+        currentLandmarkId = null
+        b?.btnDeleteLandmark?.visibility = View.GONE
+    }
+
+    /** 彈出確認對話框，刪除目前顯示的地標（資料庫來源） */
+    private fun confirmDeleteCurrentLandmark() {
+        val id  = currentLandmarkId ?: return
+        val ctx = context ?: return
+        AlertDialog.Builder(ctx, R.style.AlertDialogDark)
+            .setTitle("刪除地標")
+            .setMessage("確定要從地標資料庫刪除這個地點嗎？")
+            .setPositiveButton("刪除") { _, _ ->
+                lifecycleScope.launch {
+                    WikiLandmarkHelper.deleteById(ctx, id)
+                    toast("已刪除該地標")
+                    hideLandmarkDeleteButton()
+                }
+            }
+            .setNegativeButton("取消", null)
+            .show()
     }
 
     private fun stopMocking() {
@@ -619,6 +703,26 @@ class MapFragment : Fragment() {
         }
     }
 
+    /**
+     * 畫出「沿道路走」模式實際查到的道路路徑（跟使用者點的航點直線分開一條線），
+     * 用不同顏色（綠色）呈現，方便跟原本的藍色航點連線區分。
+     * 每次開始模擬前呼叫，會先清掉上一次的預覽線再畫新的。
+     */
+    private fun drawRoadPreview(points: List<GeoPoint>) {
+        val binding = b ?: return
+        roadPreviewLines.forEach { binding.mapView.overlays.remove(it) }
+        roadPreviewLines.clear()
+        if (points.size < 2) return
+        val line = Polyline(binding.mapView).apply {
+            setPoints(points)
+            outlinePaint.color = 0xFF2E7D32.toInt()
+            outlinePaint.strokeWidth = 8f
+        }
+        roadPreviewLines.add(line)
+        binding.mapView.overlays.add(line)
+        binding.mapView.invalidate()
+    }
+
     private fun placeFixedMarker(point: GeoPoint) {
         val binding = b ?: return
         fixedMarker?.let { binding.mapView.overlays.remove(it) }
@@ -643,10 +747,12 @@ class MapFragment : Fragment() {
 
     private fun clearAllOverlays() {
         val binding = _b
+        hideLandmarkDeleteButton()
         fixedMarker?.let { binding?.mapView?.overlays?.remove(it) }; fixedMarker = null
         movingMarker?.let { binding?.mapView?.overlays?.remove(it) }; movingMarker = null
         waypointMarkers.forEach { binding?.mapView?.overlays?.remove(it) }; waypointMarkers.clear()
         routeLines.forEach { binding?.mapView?.overlays?.remove(it) }; routeLines.clear()
+        roadPreviewLines.forEach { binding?.mapView?.overlays?.remove(it) }; roadPreviewLines.clear()
         waypoints.clear()
         binding?.mapView?.invalidate()
     }

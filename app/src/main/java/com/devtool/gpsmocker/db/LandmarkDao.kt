@@ -44,6 +44,16 @@ interface LandmarkDao {
 
     @Query("DELETE FROM landmarks")
     suspend fun deleteAll()
+
+    // ── 刪除機制 ────────────────────────────────
+
+    /** 刪除單筆地標 */
+    @Query("DELETE FROM landmarks WHERE id = :id")
+    suspend fun deleteById(id: Int)
+
+    /** 依名稱模糊搜尋地標（地標管理清單用；空字串請改呼叫 getAll） */
+    @Query("SELECT * FROM landmarks WHERE name LIKE '%' || :query || '%' ORDER BY continent, name")
+    suspend fun search(query: String): List<LandmarkEntity>
 }
 
 data class ContinentStat(val continent: String, val cnt: Int)

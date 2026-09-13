@@ -35,6 +35,18 @@
             android:padding="6dp"
             android:contentDescription="隨機地標"/>
 
+        <ImageButton
+            android:id="@+id/btnDeleteLandmark"
+            android:layout_width="40dp"
+            android:layout_height="40dp"
+            android:layout_marginEnd="6dp"
+            android:src="@android:drawable/ic_menu_delete"
+            android:background="@color/surface"
+            android:tint="@color/error"
+            android:padding="6dp"
+            android:visibility="gone"
+            android:contentDescription="刪除此地標"/>
+
         <EditText
             android:id="@+id/etSearch"
             android:layout_width="0dp"
@@ -189,6 +201,13 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="循環"
+                android:textColor="@color/text_secondary"/>
+            <CheckBox
+                android:id="@+id/cbFollowRoad"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="12dp"
+                android:text="沿道路走"
                 android:textColor="@color/text_secondary"/>
         </LinearLayout>
 

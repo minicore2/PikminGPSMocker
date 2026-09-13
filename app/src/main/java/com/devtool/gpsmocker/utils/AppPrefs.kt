@@ -11,6 +11,7 @@ object AppPrefs {
     private const val KEY_LOOP           = "loop_enabled"
     private const val KEY_START_FROM     = "start_from"   // "last", "gps", "none"
     private const val KEY_STEP_BACKEND   = "step_backend" // "hc", "local"
+    private const val KEY_FOLLOW_ROAD    = "follow_road"  // 路線模式二：沿道路走
 
     enum class StartFrom { LAST_POSITION, DEVICE_GPS, NONE }
 
@@ -34,4 +35,8 @@ object AppPrefs {
 
     fun saveStepBackend(ctx: Context, hc: Boolean) = p(ctx).edit().putBoolean(KEY_STEP_BACKEND, hc).apply()
     fun loadStepBackend(ctx: Context): Boolean = p(ctx).getBoolean(KEY_STEP_BACKEND, true)
+
+    /** 路線模式二（沿道路走）開關，預設關閉＝維持原本的直線模式 */
+    fun saveFollowRoad(ctx: Context, v: Boolean) = p(ctx).edit().putBoolean(KEY_FOLLOW_ROAD, v).apply()
+    fun loadFollowRoad(ctx: Context): Boolean    = p(ctx).getBoolean(KEY_FOLLOW_ROAD, false)
 }
