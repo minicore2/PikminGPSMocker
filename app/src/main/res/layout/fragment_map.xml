@@ -209,6 +209,13 @@
                 android:layout_marginStart="12dp"
                 android:text="沿道路走"
                 android:textColor="@color/text_secondary"/>
+            <CheckBox
+                android:id="@+id/cbReverse"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="12dp"
+                android:text="反向"
+                android:textColor="@color/text_secondary"/>
         </LinearLayout>
 
         <LinearLayout
@@ -222,7 +229,9 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="清除"
-                android:layout_marginEnd="8dp"/>
+                android:layout_marginEnd="4dp"/>
+
+
 
             <Button
                 android:id="@+id/btnStartStop"

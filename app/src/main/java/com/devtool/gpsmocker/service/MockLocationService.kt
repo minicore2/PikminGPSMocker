@@ -44,6 +44,8 @@ class MockLocationService : Service() {
 
     var isRunning = false
         private set
+    var isPaused = false
+        private set
     var speedMps  = 1.5
     var currentLocation: GeoPoint? = null
         private set
@@ -84,12 +86,17 @@ class MockLocationService : Service() {
         stopMocking()
         setupTestProvider()
         isRunning = true
+        isPaused = false
         currentLocation = point
         sessionSteps = 0
         stepAccumulator = 0.0
         mockJob = serviceScope.launch {
             while (isActive) {
-                injectLocation(point.latitude, point.longitude, 0f)
+                if (isPaused) {
+                    currentLocation?.let { injectLocation(it.latitude, it.longitude, 0f) }
+                } else {
+                    injectLocation(point.latitude, point.longitude, 0f)
+                }
                 delay(INTERVAL_MS)
             }
         }
@@ -105,10 +112,11 @@ class MockLocationService : Service() {
     ) {
         if (waypoints.size < 2) return
         val pts = if (overrideStart != null) listOf(overrideStart) + waypoints.drop(1)
-                  else waypoints
+                  else waypoints.toList()
         stopMocking()
         setupTestProvider()
         isRunning = true
+        isPaused = false
         sessionSteps = 0
         stepAccumulator = 0.0
 
@@ -123,6 +131,14 @@ class MockLocationService : Service() {
 
                     for (tick in 0..totalTicks) {
                         if (!isActive) return@launch
+
+                        if (isPaused) {
+                            currentLocation?.let {
+                                injectLocation(it.latitude, it.longitude, 0f)
+                                delay(INTERVAL_MS)
+                            } ?: run { delay(INTERVAL_MS) }
+                            continue
+                        }
 
                         val tickStart = Instant.now()
                         val frac = if (totalTicks == 0) 1.0
@@ -141,7 +157,6 @@ class MockLocationService : Service() {
                         delay(INTERVAL_MS)
 
                         val tickEnd = Instant.now()
-                        // Invoke on the calling side — caller decides which thread to dispatch to
                         onLocationUpdate?.invoke(pt, segIdx, pts.size - 1, newSteps, tickStart, tickEnd)
                     }
                 }
@@ -155,8 +170,19 @@ class MockLocationService : Service() {
                     onRouteFinished?.invoke()
                     // Hold position at destination
                     while (isActive) {
-                        injectLocation(last.latitude, last.longitude, 0f)
+                        if (isPaused) {
+                            currentLocation?.let { injectLocation(it.latitude, it.longitude, 0f) }
+                        } else {
+                            injectLocation(last.latitude, last.longitude, 0f)
+                        }
                         delay(INTERVAL_MS)
+                    }
+                } else {
+                    if (isPaused) {
+                        while (isActive && isPaused) {
+                            currentLocation?.let { injectLocation(it.latitude, it.longitude, 0f) }
+                            delay(INTERVAL_MS)
+                        }
                     }
                 }
             } while (isActive && looping)
@@ -170,10 +196,21 @@ class MockLocationService : Service() {
 
     // ── Stop ──────────────────────────────────────
 
+    fun pauseMocking() {
+        isPaused = true
+        updateNotification("⏸ 暫停中 - 繼續發送目前位置")
+    }
+
+    fun resumeMocking() {
+        isPaused = false
+        updateNotification("🚶 路線模擬中")
+    }
+
     fun stopMocking() {
         mockJob?.cancel()
         mockJob = null
         isRunning = false
+        isPaused = false
         try { locationManager.removeTestProvider(PROVIDER) } catch (_: Exception) {}
         updateNotification("PikminGPSMocker 待機中")
     }

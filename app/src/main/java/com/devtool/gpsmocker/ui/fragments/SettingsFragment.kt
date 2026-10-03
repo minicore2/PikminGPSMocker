@@ -34,7 +34,12 @@ class SettingsFragment : Fragment() {
         PermissionController.createRequestPermissionResultContract()
     ) { granted ->
         lifecycleScope.launch {
-            if (granted.containsAll(HealthConnectHelper.PERMISSIONS)) {
+            android.util.Log.d("SettingsFragment", "HC granted set: $granted")
+            android.util.Log.d("SettingsFragment", "HC required set: ${HealthConnectHelper.PERMISSIONS}")
+            val allGranted = HealthConnectHelper.PERMISSIONS.all { req ->
+                granted.any { g -> g == req || g.endsWith(req.substringAfterLast('.')) }
+            }
+            if (allGranted) {
                 StepManager.setPreferredBackend(requireContext(), StepManager.Backend.HEALTH_CONNECT)
                 vm.refreshSteps()
                 toast("✅ Health Connect 授權成功")
@@ -144,8 +149,12 @@ class SettingsFragment : Fragment() {
             lifecycleScope.launch {
                 val ctx = context ?: return@launch
                 if (!HealthConnectHelper.isAvailable(ctx)) { toast("此裝置不支援 Health Connect"); return@launch }
-                if (HealthConnectHelper.hasPermissions(ctx)) { vm.refreshSteps(); toast("Health Connect 已授權") }
-                else hcPermLauncher.launch(HealthConnectHelper.PERMISSIONS)
+                if (HealthConnectHelper.hasPermissions(ctx)) {
+                    vm.refreshSteps()
+                    toast("Health Connect 已授權")
+                } else {
+                    hcPermLauncher.launch(HealthConnectHelper.PERMISSIONS)
+                }
             }
         }
 

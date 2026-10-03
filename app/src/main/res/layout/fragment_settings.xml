@@ -128,6 +128,7 @@
                     android:layout_height="36dp"
                     android:layout_marginTop="8dp"
                     android:text="授權 Health Connect"
+                    android:textAppearance="@style/TextAppearance.MaterialComponents.Button"
                     android:backgroundTint="@color/accent"
                     android:textColor="@color/bg_dark"/>
             </LinearLayout>
@@ -187,7 +188,8 @@
                     android:layout_width="match_parent"
                     android:layout_height="36dp"
                     android:layout_marginTop="8dp"
-                    android:text="🌐 從 Wikipedia 更新地標庫"
+                    android:text="從 Wikipedia 更新地標庫"
+                    android:textAppearance="@style/TextAppearance.MaterialComponents.Button"
                     android:backgroundTint="@color/accent"
                     android:textColor="@color/bg_dark"
                     android:textSize="13sp"/>
@@ -198,7 +200,8 @@
                     android:layout_width="match_parent"
                     android:layout_height="36dp"
                     android:layout_marginTop="6dp"
-                    android:text="⏹ 停止抓取"
+                    android:text="停止抓取"
+                    android:textAppearance="@style/TextAppearance.MaterialComponents.Button"
                     android:strokeColor="@color/error"
                     android:textColor="@color/error"
                     android:visibility="gone"/>
@@ -210,7 +213,8 @@
                     android:layout_width="match_parent"
                     android:layout_height="36dp"
                     android:layout_marginTop="8dp"
-                    android:text="📋 管理地標（瀏覽 / 刪除）"
+                    android:text="管理地標（瀏覽 / 刪除）"
+                    android:textAppearance="@style/TextAppearance.MaterialComponents.Button"
                     android:strokeColor="@color/accent"
                     android:textColor="@color/accent"
                     android:textSize="13sp"/>
@@ -221,7 +225,8 @@
                     android:layout_width="match_parent"
                     android:layout_height="36dp"
                     android:layout_marginTop="6dp"
-                    android:text="🗑️ 清空全部地標"
+                    android:text="清空全部地標"
+                    android:textAppearance="@style/TextAppearance.MaterialComponents.Button"
                     android:strokeColor="@color/error"
                     android:textColor="@color/error"
                     android:textSize="13sp"/>
@@ -241,7 +246,8 @@
                         android:layout_height="40dp"
                         android:layout_weight="1"
                         android:layout_marginEnd="6dp"
-                        android:text="📤 匯出 CSV"
+                        android:text="匯出 CSV"
+                        android:textAppearance="@style/TextAppearance.MaterialComponents.Button"
                         android:textSize="12sp"
                         android:strokeColor="@color/accent"
                         android:textColor="@color/accent"/>
@@ -252,7 +258,8 @@
                         android:layout_width="0dp"
                         android:layout_height="40dp"
                         android:layout_weight="1"
-                        android:text="📥 匯入 CSV"
+                        android:text="匯入 CSV"
+                        android:textAppearance="@style/TextAppearance.MaterialComponents.Button"
                         android:textSize="12sp"
                         android:strokeColor="@color/accent"
                         android:textColor="@color/accent"/>

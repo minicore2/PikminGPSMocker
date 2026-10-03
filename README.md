@@ -14,7 +14,7 @@ Android GPS 模擬工具，專為開發者測試位置功能設計。
 ## 環境需求
 
 - Android Studio Hedgehog 以上
-- Android 10+ (API 29+)
+- Android 14+ (API 34+)
 - 手機需開啟**開發者模式**
 
 已測試:

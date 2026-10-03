@@ -74,6 +74,7 @@ class MapFragment : Fragment() {
     // （跟 routeLines 分開存放，因為它不是使用者點的航點連線，是查詢結果）
     private val roadPreviewLines = mutableListOf<Polyline>()
     private var movingMarker:   Marker? = null
+    private var routeReversed = false
 
     private var searchJob: Job? = null
 
@@ -357,8 +358,29 @@ class MapFragment : Fragment() {
 
     private fun setupButtons() {
         val binding = b ?: return
+        var lastStartStopClick = 0L
         binding.btnStartStop.setOnClickListener {
-            if (svc?.isRunning == true) stopMocking() else startMocking()
+            val now = System.currentTimeMillis()
+            val s = svc
+            if (s?.isRunning == true) {
+                if (s.isPaused) {
+                    s.resumeMocking()
+                } else {
+                    s.pauseMocking()
+                }
+            } else {
+                startMocking()
+            }
+            lastStartStopClick = now
+        }
+        binding.btnStartStop.setOnLongClickListener {
+            stopMocking()
+            true
+        }
+        binding.cbReverse.setOnCheckedChangeListener { _, checked ->
+            if (checked != routeReversed) {
+                toggleReverseRoute()
+            }
         }
         binding.btnClear.setOnClickListener { stopMocking(); clearAllOverlays(); switchMode() }
         binding.btnUndoWp.setOnClickListener { removeLastWaypoint() }
@@ -606,11 +628,31 @@ class MapFragment : Fragment() {
     private fun setRunning(running: Boolean) {
         val binding = _b ?: return
         val ctx = context ?: return
-        binding.btnStartStop.text = if (running) "⏹ 停止" else "▶ 開始"
-        binding.btnStartStop.backgroundTintList = ctx.getColorStateList(
-            if (running) android.R.color.holo_red_dark else R.color.accent
-        )
-        binding.btnStartStop.setTextColor(ctx.getColor(R.color.bg_dark))
+        val s = svc
+        when {
+            !running -> {
+                binding.btnStartStop.text = "▶ 開始"
+                binding.btnStartStop.backgroundTintList = ctx.getColorStateList(R.color.accent)
+                binding.btnStartStop.setTextColor(ctx.getColor(R.color.bg_dark))
+                binding.cbReverse.isEnabled = true
+            }
+            running && s?.isPaused == true -> {
+                binding.btnStartStop.text = "▶ 繼續"
+                binding.btnStartStop.backgroundTintList = ctx.getColorStateList(R.color.accent)
+                binding.btnStartStop.setTextColor(ctx.getColor(R.color.bg_dark))
+                binding.cbReverse.isEnabled = waypoints.size >= 2
+            }
+            running && s?.isPaused != true -> {
+                binding.btnStartStop.text = "⏸ 暫停"
+                binding.btnStartStop.backgroundTintList = ctx.getColorStateList(android.R.color.holo_orange_dark)
+                binding.btnStartStop.setTextColor(ctx.getColor(R.color.bg_dark))
+                binding.cbReverse.isEnabled = waypoints.size >= 2
+            }
+        }
+        if (!running) {
+            binding.cbReverse.isEnabled = true
+        }
+        binding.cbReverse.isChecked = routeReversed
     }
 
     private fun getDeviceGpsPosition(): GeoPoint? {
@@ -745,6 +787,65 @@ class MapFragment : Fragment() {
         binding.mapView.invalidate()
     }
 
+    private fun toggleReverseRoute() {
+        if (waypoints.size < 2) {
+            _b?.cbReverse?.isChecked = routeReversed
+            toast("至少需要 2 個航點才能反向")
+            return
+        }
+        waypoints.reverse()
+        routeReversed = !routeReversed
+        _b?.cbReverse?.isChecked = routeReversed
+        redrawRouteOverlays()
+        updateRouteInfo()
+    }
+
+    private fun redrawRouteOverlays() {
+        val binding = _b ?: return
+        routeLines.forEach { binding.mapView.overlays.remove(it) }
+        routeLines.clear()
+        waypointMarkers.forEach { binding.mapView.overlays.remove(it) }
+        waypointMarkers.clear()
+        roadPreviewLines.forEach { binding.mapView.overlays.remove(it) }
+        roadPreviewLines.clear()
+
+        waypoints.forEachIndexed { idx, p ->
+            val marker = Marker(binding.mapView).apply {
+                position = p
+                icon = ContextCompat.getDrawable(
+                    requireContext(),
+                    when {
+                        idx == 0 -> R.drawable.ic_marker_start
+                        idx == waypoints.size - 1 -> R.drawable.ic_marker_end
+                        else -> R.drawable.ic_marker_mid
+                    }
+                )
+                title = when {
+                    idx == 0 -> "🟢 起點"
+                    idx == waypoints.size - 1 -> "🔴 終點"
+                    else -> "🔵 P${idx + 1}"
+                }
+                setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_CENTER)
+            }
+            binding.mapView.overlays.add(marker)
+            waypointMarkers.add(marker)
+        }
+
+        if (waypoints.size >= 2) {
+            for (i in 0 until waypoints.size - 1) {
+                val line = Polyline().apply {
+                    this.setColor(0x8033B5E5.toInt())
+                    this.setWidth(8f)
+                    addPoint(waypoints[i])
+                    addPoint(waypoints[i + 1])
+                }
+                binding.mapView.overlays.add(line)
+                routeLines.add(line)
+            }
+        }
+        binding.mapView.invalidate()
+    }
+
     private fun clearAllOverlays() {
         val binding = _b
         hideLandmarkDeleteButton()
@@ -754,6 +855,8 @@ class MapFragment : Fragment() {
         routeLines.forEach { binding?.mapView?.overlays?.remove(it) }; routeLines.clear()
         roadPreviewLines.forEach { binding?.mapView?.overlays?.remove(it) }; roadPreviewLines.clear()
         waypoints.clear()
+        routeReversed = false
+        binding?.cbReverse?.isChecked = false
         binding?.mapView?.invalidate()
     }
 

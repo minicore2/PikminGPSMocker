@@ -29,7 +29,7 @@ object HealthConnectHelper {
         val status = HealthConnectClient.getSdkStatus(context)
         Log.d(TAG, "HC SDK status: $status")
         status == HealthConnectClient.SDK_AVAILABLE ||
-        status == HealthConnectClient.SDK_UNAVAILABLE_PROVIDER_UPDATE_REQUIRED
+                status == HealthConnectClient.SDK_UNAVAILABLE_PROVIDER_UPDATE_REQUIRED
     } catch (e: Exception) {
         Log.e(TAG, "isAvailable error: ${e.message}"); false
     }
@@ -49,7 +49,9 @@ object HealthConnectHelper {
             val client = clientOrNull(context) ?: return false
             val granted = client.permissionController.getGrantedPermissions()
             Log.d(TAG, "HC granted: $granted")
-            granted.containsAll(PERMISSIONS)
+            PERMISSIONS.all { req ->
+                granted.any { g -> g == req || g.endsWith(req.substringAfterLast('.')) }
+            }
         } catch (e: Exception) {
             Log.e(TAG, "hasPermissions error: ${e.message}"); false
         }
