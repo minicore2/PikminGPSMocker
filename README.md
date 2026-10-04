@@ -18,8 +18,8 @@ Android GPS 模擬工具，專為開發者測試位置功能設計。
 - 手機需開啟**開發者模式**
 
 已測試:
-1. Samsung A22 (Android 13 Samsung原廠)
-2. Samsung Galaxy S10+ (Android 13 Pixel Experience ROM) 
+1. Samsung A22 (Android 16 OneUI 8.0 Custom ROM ) from XDA https://xdaforums.com/t/port-a245f-one-ui-8-0.4799657/ binary is https://mega.nz/folder/xvZXmBSB#4l8qI4w2C7kbVtELDiBk8A/folder/Ny4CRC5J
+2. Samsung Galaxy S9+ (Android 15 OneUI 7.0 Custom ROM)  from https://www.youtube.com/watch?v=4rSLccxG3-k
 3. Mi 11 Ultra (Android 14 Mi HyperOS 2.0)
 
 
